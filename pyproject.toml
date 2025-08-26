@@ -6,7 +6,6 @@ build-backend = "hatchling.build"
 name = "taible-backend"
 version = "0.1.0"
 description = "FastAPI backend with Railway deployment, PostgreSQL, Redis, and Cloudflare R2"
-readme = "README.md"
 requires-python = ">=3.12"
 authors = [
     {name = "Taible Team"}
