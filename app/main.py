@@ -31,28 +31,34 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("正在启动FastAPI应用...")
     
     try:
-        # 初始化数据库连接
-        await db_manager.initialize()
-        logger.info("数据库连接初始化成功")
+        # 数据库和Redis在初始化时已经自动连接
+        logger.info("检查数据库连接...")
+        if db_manager.engine:
+            logger.info("数据库连接已就绪")
+        else:
+            logger.warning("数据库未配置，跳过数据库相关操作")
         
-        # 初始化Redis连接
-        await redis_manager.initialize()
-        logger.info("Redis连接初始化成功")
+        logger.info("检查Redis连接...")
+        if redis_manager.redis_client:
+            logger.info("Redis连接已就绪")
+        else:
+            logger.warning("Redis未配置，跳过Redis相关操作")
         
-        # 运行数据库迁移
-        try:
-            await db_manager.run_migrations()
-            logger.info("数据库迁移完成")
-        except Exception as migration_error:
-            logger.warning(f"数据库迁移失败，尝试使用备用方法: {migration_error}")
-            # 如果迁移失败，使用备用方法（仅适用于开发环境）
-            if settings.debug:
-                await db_manager.create_tables_fallback()
-                logger.info("使用备用方法完成数据库表创建")
-            else:
-                # 生产环境下迁移失败应该停止启动
-                logger.error("生产环境下数据库迁移失败，应用启动终止")
-                raise
+        # 运行数据库迁移（仅在数据库已配置时）
+        if db_manager.engine:
+            try:
+                await db_manager.run_migrations()
+                logger.info("数据库迁移完成")
+            except Exception as migration_error:
+                logger.warning(f"数据库迁移失败，尝试使用备用方法: {migration_error}")
+                # 如果迁移失败，使用备用方法（仅适用于开发环境）
+                if settings.debug:
+                    await db_manager.create_tables_fallback()
+                    logger.info("使用备用方法完成数据库表创建")
+                else:
+                    # 生产环境下迁移失败应该停止启动
+                    logger.error("生产环境下数据库迁移失败，应用启动终止")
+                    raise
         
         logger.info("应用启动完成")
         
@@ -162,26 +168,35 @@ async def health_check() -> APIResponse[HealthCheckResponse]:
     # 检查数据库连接
     database_healthy = False
     try:
-        async with db_manager.get_session() as session:
-            await session.execute("SELECT 1")
-        database_healthy = True
+        if db_manager.async_session:
+            from sqlalchemy import text
+            async with db_manager.get_session() as session:
+                await session.execute(text("SELECT 1"))
+            database_healthy = True
+        else:
+            logger.info("数据库未配置，跳过健康检查")
     except Exception as e:
         logger.error(f"数据库健康检查失败: {e}")
     
     # 检查Redis连接
     redis_healthy = False
     try:
-        redis_healthy = await redis_manager.health_check()
+        if redis_manager.redis_client:
+            await redis_manager.ping()
+            redis_healthy = True
+        else:
+            logger.info("Redis未配置，跳过健康检查")
     except Exception as e:
         logger.error(f"Redis健康检查失败: {e}")
     
     # 检查存储服务（简单检查配置是否完整）
-    storage_healthy = bool(
-        settings.r2_access_key_id and
-        settings.r2_secret_access_key and
-        settings.r2_bucket_name and
-        settings.r2_endpoint_url
-    )
+    r2_config = settings.r2_config
+    storage_healthy = bool(r2_config and all([
+        r2_config.get('aws_access_key_id'),
+        r2_config.get('aws_secret_access_key'),
+        settings.r2_bucket_name,
+        r2_config.get('endpoint_url')
+    ]))
     
     # 整体健康状态
     overall_healthy = database_healthy and redis_healthy and storage_healthy
