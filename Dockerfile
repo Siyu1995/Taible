@@ -59,7 +59,6 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 COPY app/ ./app/
 COPY alembic/ ./alembic/
 COPY alembic.ini ./
-COPY start.py ./
 
 # 更改文件所有权
 RUN chown -R appuser:appuser /app
