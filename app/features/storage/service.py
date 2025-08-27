@@ -45,8 +45,8 @@ class R2StorageService:
                 region_name=settings.region_name,
             )
             
-            # 默认存储桶名称（从endpoint URL提取）
-            self.bucket_name = "taible-storage"
+            # 从配置获取存储桶名称，如果未配置则使用默认值
+            self.bucket_name = settings.r2_bucket_name or "taible-singapore"
             
             logger.info(f"R2存储服务已初始化，端点: {settings.endpoint_url}")
             
