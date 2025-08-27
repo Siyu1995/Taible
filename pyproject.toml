@@ -48,6 +48,7 @@ dev = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["app"]
+only-include = ["app", "start.py"]
 
 [tool.black]
 line-length = 88
