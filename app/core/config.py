@@ -24,20 +24,31 @@ class Settings(BaseSettings):
     )
     
     # 数据库配置
-    database_url: str = Field(
+    database_url: Optional[str] = Field(
+        default=None,
         description="PostgreSQL数据库连接URL（Railway注入的同步URL）"
     )
     
     # Redis配置
-    redis_url: str = Field(
+    redis_url: Optional[str] = Field(
+        default=None,
         description="Redis连接URL（Railway注入的同步URL）"
     )
     
     # Cloudflare R2配置
     service_name: str = Field(default="s3", description="S3兼容服务名称")
-    endpoint_url: str = Field(description="Cloudflare R2端点URL")
-    aws_access_key_id: str = Field(description="R2访问密钥ID")
-    aws_secret_access_key: str = Field(description="R2秘密访问密钥")
+    endpoint_url: Optional[str] = Field(
+        default=None,
+        description="Cloudflare R2端点URL"
+    )
+    aws_access_key_id: Optional[str] = Field(
+        default=None,
+        description="R2访问密钥ID"
+    )
+    aws_secret_access_key: Optional[str] = Field(
+        default=None,
+        description="R2秘密访问密钥"
+    )
     region_name: str = Field(default="auto", description="R2区域名称")
     
     # 应用配置
@@ -53,15 +64,18 @@ class Settings(BaseSettings):
     
     @computed_field
     @property
-    def async_database_url(self) -> str:
+    def async_database_url(self) -> Optional[str]:
         """将Railway的同步PostgreSQL URL转换为异步URL
         
         Railway注入的DATABASE_URL使用postgresql://前缀，
         但asyncpg需要postgresql+asyncpg://前缀
         
         Returns:
-            str: 异步数据库连接URL
+            Optional[str]: 异步数据库连接URL，如果未配置则返回None
         """
+        if not self.database_url:
+            return None
+        
         if self.database_url.startswith("postgresql://"):
             return self.database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
         elif self.database_url.startswith("postgres://"):
@@ -70,26 +84,32 @@ class Settings(BaseSettings):
     
     @computed_field
     @property
-    def async_redis_url(self) -> str:
+    def async_redis_url(self) -> Optional[str]:
         """处理Redis URL确保兼容性
         
         Railway的Redis URL通常已经是正确格式，但确保使用redis://前缀
         
         Returns:
-            str: Redis连接URL
+            Optional[str]: Redis连接URL，如果未配置则返回None
         """
+        if not self.redis_url:
+            return None
+        
         if not self.redis_url.startswith(("redis://", "rediss://")):
             return f"redis://{self.redis_url}"
         return self.redis_url
     
     @computed_field
     @property
-    def r2_config(self) -> dict[str, str]:
+    def r2_config(self) -> Optional[dict[str, str]]:
         """Cloudflare R2配置字典
         
         Returns:
-            dict: R2客户端配置参数
+            Optional[dict]: R2客户端配置参数，如果未完整配置则返回None
         """
+        if not all([self.endpoint_url, self.aws_access_key_id, self.aws_secret_access_key]):
+            return None
+        
         return {
             "service_name": self.service_name,
             "endpoint_url": self.endpoint_url,
