@@ -19,9 +19,16 @@ RUN pip install --no-cache-dir uv
 
 # 复制依赖文件
 COPY pyproject.toml ./
+# 注意：如果有uv.lock文件，也需要复制
+# COPY uv.lock ./
 
-# 使用uv安装Python依赖
-RUN uv pip install --system --no-cache -e .
+# 使用uv sync安装依赖（推荐方式，更快且确保版本一致性）
+# 如果没有uv.lock文件，使用pip install作为fallback
+RUN if [ -f "uv.lock" ]; then \
+        uv sync --frozen --no-dev; \
+    else \
+        uv pip install --system --no-cache -e .; \
+    fi
 
 # 第二阶段：运行阶段
 FROM python:3.12-slim as runtime
