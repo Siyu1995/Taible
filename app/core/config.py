@@ -50,9 +50,14 @@ class Settings(BaseSettings):
         description="R2秘密访问密钥"
     )
     region_name: str = Field(default="auto", description="R2区域名称")
+    r2_bucket_name: Optional[str] = Field(
+        default=None,
+        description="R2存储桶名称"
+    )
     
     # 应用配置
     app_name: str = Field(default="Taible Backend", description="应用名称")
+    app_version: str = Field(default="1.0.0", description="应用版本")
     debug: bool = Field(default=False, description="调试模式")
     host: str = Field(default="0.0.0.0", description="服务器主机")
     port: int = Field(default=8000, description="服务器端口")
