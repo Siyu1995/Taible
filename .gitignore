@@ -194,7 +194,7 @@ settings.json
 .env.production
 
 # Alembic
-alembic.ini
+# alembic.ini - 注释掉以便提交配置文件
 
 # Node modules (if using frontend)
 node_modules/
