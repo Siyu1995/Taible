@@ -170,9 +170,10 @@ async def health_check() -> APIResponse[HealthCheckResponse]:
     try:
         if db_manager.async_session:
             from sqlalchemy import text
-            async with db_manager.get_session() as session:
+            async for session in db_manager.get_session():
                 await session.execute(text("SELECT 1"))
-            database_healthy = True
+                database_healthy = True
+                break  # 只需要一次检查
         else:
             logger.info("数据库未配置，跳过健康检查")
     except Exception as e:
