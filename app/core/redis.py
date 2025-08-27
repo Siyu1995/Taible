@@ -23,7 +23,15 @@ class RedisManager:
         """初始化Redis管理器
         
         创建Redis连接池，配置连接参数
+        如果Redis URL未配置，则跳过初始化
         """
+        self.redis_pool = None
+        self.redis_client = None
+        
+        if not settings.async_redis_url:
+            logger.warning("Redis URL未配置，跳过Redis初始化")
+            return
+        
         self.redis_pool = redis.ConnectionPool.from_url(
             settings.async_redis_url,
             max_connections=20,  # 最大连接数
@@ -46,6 +54,10 @@ class RedisManager:
         Returns:
             bool: 连接是否正常
         """
+        if not self.redis_client:
+            logger.warning("Redis未初始化，无法检查连接")
+            return False
+        
         try:
             await self.redis_client.ping()
             return True
@@ -58,8 +70,11 @@ class RedisManager:
         
         在应用关闭时调用，清理资源
         """
-        await self.redis_client.close()
-        logger.info("Redis连接已关闭")
+        if self.redis_client:
+            await self.redis_client.close()
+            logger.info("Redis连接已关闭")
+        else:
+            logger.info("Redis未初始化，无需关闭")
     
     def _serialize_value(self, value: Any) -> str:
         """序列化值为JSON字符串
@@ -124,6 +139,10 @@ class RedisManager:
         Returns:
             Optional[Any]: 缓存值，不存在返回None
         """
+        if not self.redis_client:
+            logger.debug(f"Redis未初始化，跳过获取缓存: {key}")
+            return None
+        
         try:
             value = await self.redis_client.get(key)
             if value is None:
@@ -149,6 +168,10 @@ class RedisManager:
         Returns:
             bool: 是否设置成功
         """
+        if not self.redis_client:
+            logger.debug(f"Redis未初始化，跳过设置缓存: {key}")
+            return False
+        
         try:
             serialized_value = self._serialize_value(value)
             if ttl:
@@ -169,6 +192,10 @@ class RedisManager:
         Returns:
             bool: 是否删除成功
         """
+        if not self.redis_client:
+            logger.debug(f"Redis未初始化，跳过删除缓存: {key}")
+            return False
+        
         try:
             result = await self.redis_client.delete(key)
             return result > 0
@@ -185,6 +212,10 @@ class RedisManager:
         Returns:
             bool: 是否存在
         """
+        if not self.redis_client:
+            logger.debug(f"Redis未初始化，跳过检查缓存: {key}")
+            return False
+        
         try:
             result = await self.redis_client.exists(key)
             return result > 0

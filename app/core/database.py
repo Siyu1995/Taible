@@ -29,7 +29,15 @@ class DatabaseManager:
         """初始化数据库管理器
         
         创建异步引擎和会话工厂，配置连接池参数
+        如果数据库URL未配置，则跳过初始化
         """
+        self.engine = None
+        self.async_session = None
+        
+        if not settings.async_database_url:
+            logger.warning("数据库URL未配置，跳过数据库初始化")
+            return
+        
         self.engine = create_async_engine(
             settings.async_database_url,
             echo=settings.debug,  # 调试模式下打印SQL语句
@@ -55,6 +63,10 @@ class DatabaseManager:
         使用 Alembic 自动运行数据库迁移到最新版本。
         这比直接 create_all 更安全，支持增量更新而不会丢失数据。
         """
+        if not self.engine:
+            logger.warning("数据库未初始化，跳过迁移")
+            return
+        
         try:
             # 在单独的线程中运行 Alembic 迁移，因为 Alembic 是同步的
             await asyncio.get_event_loop().run_in_executor(
@@ -87,6 +99,10 @@ class DatabaseManager:
         仅在 Alembic 迁移失败时使用，直接创建所有表。
         注意：这种方法不支持数据迁移，可能会导致数据丢失。
         """
+        if not self.engine:
+            logger.warning("数据库未初始化，跳过表创建")
+            return
+        
         try:
             async with self.engine.begin() as conn:
                 await conn.run_sync(SQLModel.metadata.create_all)
@@ -100,8 +116,11 @@ class DatabaseManager:
         
         在应用关闭时调用，清理资源
         """
-        await self.engine.dispose()
-        logger.info("数据库连接已关闭")
+        if self.engine:
+            await self.engine.dispose()
+            logger.info("数据库连接已关闭")
+        else:
+            logger.info("数据库未初始化，无需关闭")
     
     async def get_session(self) -> AsyncGenerator[AsyncSession, None]:
         """获取数据库会话
@@ -110,7 +129,13 @@ class DatabaseManager:
         
         Yields:
             AsyncSession: 数据库会话
+        
+        Raises:
+            RuntimeError: 当数据库未初始化时抛出
         """
+        if not self.async_session:
+            raise RuntimeError("数据库未初始化，无法获取会话")
+        
         async with self.async_session() as session:
             try:
                 yield session
